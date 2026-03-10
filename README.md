@@ -8,7 +8,7 @@
 ## 核心技术
 
 * **NMPC (Nonlinear MPC)**：基于 OCS2 库的全身轨迹规划（持续优化中）。
-* **WBC (Whole-Body Control)**：支持多任务优先级配置的全身控制。
+* **WBC (Whole-Body Control)**：支持基于权重分配的多任务全身控制。
 * **状态估计**：集成卡尔曼滤波（KF）实现高频机身位姿追踪。
 
 ## 快速上手
@@ -31,3 +31,10 @@ ros2 launch dog_bringup sim.launch.py
 ```
 
 ---
+
+
+## 后续计划
+
+* 优化 NMPC 模块的移植适配
+* 集成机器人运动安全检测与保护机制
+* 加入真机部署的定位功能
