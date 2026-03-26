@@ -15,8 +15,11 @@ find_package(gazebo_ros REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(gazebo_dev REQUIRED)
+find_package(Threads REQUIRED)
 
-# 仿真驱动插件
+# -----------------------------------------------------------------------------
+# 1. 仿真驱动插件 (dog_gazebo_hw)
+# -----------------------------------------------------------------------------
 add_library(dog_gazebo_hw SHARED src/dog_gazebo_hw.cpp)
 target_include_directories(
   dog_gazebo_hw PRIVATE include ${GAZEBO_INCLUDE_DIRS}
@@ -24,11 +27,24 @@ target_include_directories(
 ament_target_dependencies(dog_gazebo_hw hardware_interface gazebo_ros2_control
                           gazebo_ros rclcpp pluginlib)
 target_link_libraries(dog_gazebo_hw ${GAZEBO_LIBRARIES})
+
 pluginlib_export_plugin_description_file(gazebo_ros2_control dog_hardware.xml)
+# -----------------------------------------------------------------------------
+# 1. 实物驱动插件 (J60_6_hw)
+# -----------------------------------------------------------------------------
+# add_library(J60_6_hw SHARED src/J60_6/J60_6_hw.cpp)
+
+# target_include_directories(J60_6_hw PRIVATE include)
+
+# ament_target_dependencies(J60_6_hw hardware_interface rclcpp pluginlib)
+
+# target_link_libraries(J60_6_hw Threads::Threads)
+
+# pluginlib_export_plugin_description_file(hardware_interface dog_hardware.xml)
 
 # 安装规则
 install(
-  TARGETS dog_gazebo_hw
+  TARGETS dog_gazebo_hw # J60_6_hw
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})

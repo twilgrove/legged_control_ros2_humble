@@ -17,7 +17,7 @@ def generate_launch_description():
     gazebo_pkg = get_package_share_directory("gazebo_ros")
     pkg = get_package_share_directory("dog_bringup")
 
-    xacro_file = os.path.join(pkg, "xacro", "dog.xacro")
+    xacro_file = os.path.join(pkg, "xacro", "cdut_dog", "dog.xacro")
     urdf_output_dir = os.path.join(pkg, "config", "description")
     urdf_output_file = os.path.join(urdf_output_dir, "dog.urdf")
     world_file = os.path.join(pkg, "config", "dog.world")
@@ -66,7 +66,7 @@ def generate_launch_description():
             "-y",
             "0",
             "-z",
-            "0.06",
+            "0.09",
             "-timeout",
             "300",
         ],

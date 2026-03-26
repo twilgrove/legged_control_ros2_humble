@@ -49,13 +49,13 @@ namespace dog_hardware
             double initial_pos = 0.0;
 
 #if JointPosition == 0 // 前趴
-            double HAA = 0.4;
-            double HFE = -1.2;
-            double KFE = 2.79;
-#elif JointPosition == 1 // 后趴
-            double HAA = 0.0;
-            double HFE = -2.67;
-            double KFE = 2.79;
+            double HAA = -0.5;
+            double HFE = -1.19;
+            double KFE = 0.5;
+#elif JointPosition == 1
+            double HAA = 0.5;
+            double HFE = 0.06;
+            double KFE = 0.5;
 #elif JointPosition == 2 // 站立
             double HAA = 0.0;
             double HFE = -0.8;

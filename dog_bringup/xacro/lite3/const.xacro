@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
     <!-- xacro ./dog.xacro > dog.urdf -->
-    <xacro:property name="mesh_path" value="package://dog_bringup/meshes"/>
+    <xacro:property name="mesh_path" value="package://dog_bringup/meshes/lite3"/>
     <xacro:property name="cfg" value="${xacro.load_yaml('$(find dog_bringup)/config/robot_controllers.yaml')}"/>
 
 <!-- 躯干参数 -->

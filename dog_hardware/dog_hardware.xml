@@ -7,3 +7,13 @@
     </description>
   </class>
 </library>
+
+<library path="J60_6_hw">
+  <class name="dog_hardware/J60_6_hw"
+         type="dog_hardware::J60_6_hw"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      四足机器人 J60-6 电机实物硬件接口，支持 4 路 CAN 并行通信及异步 IMU 读取，适配 1kHz 实时控制。
+    </description>
+  </class>
+</library>

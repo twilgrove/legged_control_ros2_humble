@@ -16,8 +16,8 @@ controller_manager:
         variance: 0.0012
         
     DogNmpcWbcController:
-      type: dog_controllers/DogNmpcWbcController
-      # type: dog_controllers/DogNmpcWbcController_God
+      # type: dog_controllers/DogNmpcWbcController
+      type: dog_controllers/DogNmpcWbcController_God
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
     effort_controller:
