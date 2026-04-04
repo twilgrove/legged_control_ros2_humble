@@ -3,7 +3,7 @@
 #include <gazebo/sensors/SensorManager.hh>
 
 // 0:前趴；1：后趴；2：站立；
-#define JointPosition 0
+#define JointPosition 1
 namespace dog_hardware
 {
     CallbackReturn DogGazeboHW::on_init(const hardware_interface::HardwareInfo &info)
@@ -24,14 +24,8 @@ namespace dog_hardware
         RCLCPP_INFO(node_->get_logger(), "\033[1;36m[ 初始化开始 ] 🚀 DogGazeboHW\033[0m");
         // 提取参数
         delay_ = std::stod(hardware_info.hardware_parameters.at("delay"));
-        double a_var = std::stod(hardware_info.hardware_parameters.at("imu_accel_var"));
-        double g_var = std::stod(hardware_info.hardware_parameters.at("imu_gyro_var"));
-        double o_var = std::stod(hardware_info.hardware_parameters.at("imu_ori_var"));
         RCLCPP_INFO(node_->get_logger(), "\033[1;33m📊 [PARAM] 已加载配置清单:\033[0m");
-        RCLCPP_INFO(node_->get_logger(), "\033[1;33m  ├─ 命令延迟      : \033[0m%.3f 秒", delay_);
-        RCLCPP_INFO(node_->get_logger(), "\033[1;33m  ├─ 加速度协方差  : \033[0m%.6f", a_var);
-        RCLCPP_INFO(node_->get_logger(), "\033[1;33m  ├─ 角速度协方差  : \033[0m%.6f", g_var);
-        RCLCPP_INFO(node_->get_logger(), "\033[1;33m  └─ 姿态协方差    : \033[0m%.6f", o_var);
+        RCLCPP_INFO(node_->get_logger(), "\033[1;33m  └─ 命令延迟      : \033[0m%.3f 秒", delay_);
 
         // --- 初始化关节 ---
         for (const auto &joint_info : hardware_info.joints)
@@ -53,8 +47,8 @@ namespace dog_hardware
             double HFE = -1.19;
             double KFE = 0.5;
 #elif JointPosition == 1
-            double HAA = 0.5;
-            double HFE = 0.06;
+            double HAA = 0.07;
+            double HFE = -1.79;
             double KFE = 0.5;
 #elif JointPosition == 2 // 站立
             double HAA = 0.0;
@@ -101,14 +95,6 @@ namespace dog_hardware
                 imu_data_.name = sensor.name;
                 auto imu_sensor = gazebo::sensors::SensorManager::Instance()->GetSensor(imu_data_.name);
                 imu_data_.gazebo_sensor = std::dynamic_pointer_cast<gazebo::sensors::ImuSensor>(imu_sensor);
-                imu_data_.lin_acc_cov.fill(0.0);
-                imu_data_.lin_acc_cov[0] = imu_data_.lin_acc_cov[4] = imu_data_.lin_acc_cov[8] = a_var;
-
-                imu_data_.ang_vel_cov.fill(0.0);
-                imu_data_.ang_vel_cov[0] = imu_data_.ang_vel_cov[4] = imu_data_.ang_vel_cov[8] = g_var;
-
-                imu_data_.ori_cov.fill(0.0);
-                imu_data_.ori_cov[0] = imu_data_.ori_cov[4] = imu_data_.ori_cov[8] = o_var;
             }
         }
         if (contact_sensors_.empty())
@@ -167,11 +153,6 @@ namespace dog_hardware
         states.emplace_back(imu_data_.name, "linear_acceleration.x", &imu_data_.lin_acc[0]);
         states.emplace_back(imu_data_.name, "linear_acceleration.y", &imu_data_.lin_acc[1]);
         states.emplace_back(imu_data_.name, "linear_acceleration.z", &imu_data_.lin_acc[2]);
-
-        // 导出协方差地址
-        states.emplace_back(imu_data_.name, "orientation_covariance", &imu_data_.ori_cov[0]);
-        states.emplace_back(imu_data_.name, "angular_velocity_covariance", &imu_data_.ang_vel_cov[0]);
-        states.emplace_back(imu_data_.name, "linear_acceleration_covariance", &imu_data_.lin_acc_cov[0]);
 
         return states;
     }

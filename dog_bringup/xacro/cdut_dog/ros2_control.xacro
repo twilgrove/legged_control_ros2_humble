@@ -12,7 +12,6 @@
             <command_interface name="velocity"/>
             <command_interface name="kp"/>
             <command_interface name="kd"/>
-            <command_interface name="mode"/>
             <state_interface name="driver_tem"/>
             <state_interface name="motor_tem"/>
             <state_interface name="error_code"/>
@@ -30,7 +29,6 @@
             <command_interface name="velocity"/>
             <command_interface name="kp"/>
             <command_interface name="kd"/>
-            <command_interface name="mode"/>
             <state_interface name="driver_tem"/>
             <state_interface name="motor_tem"/>
             <state_interface name="error_code"/>
@@ -48,7 +46,6 @@
             <command_interface name="velocity"/>
             <command_interface name="kp"/>
             <command_interface name="kd"/>
-            <command_interface name="mode"/>
             <state_interface name="driver_tem"/>
             <state_interface name="motor_tem"/>
             <state_interface name="error_code"/>

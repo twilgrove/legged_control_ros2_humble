@@ -2,7 +2,7 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
     <!-- xacro ./dog.xacro > dog.urdf -->
     <xacro:property name="mesh_path" value="package://dog_bringup/meshes/cdut_dog"/>
-    <xacro:property name="cfg" value="${xacro.load_yaml('$(find dog_bringup)/config/robot_controllers.yaml')}"/>
+    <xacro:property name="cfg" value="${xacro.load_yaml('$(find dog_bringup)/config/cdut_dog/robot_controllers.yaml')}"/>
 
 <!-- 躯干参数 -->
 <xacro:property name="torso_mass" value="5.35"/>        <!-- 躯干质量(kg) -->
@@ -74,19 +74,19 @@
 <xacro:property name="hipx_min" value="-0.5"/>          <!-- 髋x轴关节最小角度(rad，约-30°) -->
 <xacro:property name="hipx_max" value="0.5"/>           <!-- 髋x轴关节最大角度(rad，约30°) -->
 <xacro:property name="hipx_vel" value="26.2"/>            <!-- 髋x轴关节最大角速度(rad/s) -->
-<xacro:property name="hipx_eff" value="24"/>              <!-- 髋x轴关节最大力矩(N·m) -->
+<xacro:property name="hipx_eff" value="12"/>              <!-- 髋x轴关节最大力矩(N·m) -->
 
 <!-- 髋关节y轴关节限位&性能参数 -->
 <xacro:property name="hipy_min" value="-2"/>           <!-- 髋y轴关节最小角度(rad) -->
 <xacro:property name="hipy_max" value="1.6"/>           <!-- 髋y轴关节最大角度(rad，约18°) -->
 <xacro:property name="hipy_vel" value="26.2"/>            <!-- 髋y轴关节最大角速度(rad/s) -->
-<xacro:property name="hipy_eff" value="24"/>              <!-- 髋y轴关节最大力矩(N·m) -->
+<xacro:property name="hipy_eff" value="12"/>              <!-- 髋y轴关节最大力矩(N·m) -->
 
 <!-- 膝关节限位&性能参数 -->
 <xacro:property name="knee_min" value="-2"/>           <!-- 膝关节最小角度(rad，约30°) -->
 <xacro:property name="knee_max" value="0.5"/>           <!-- 膝关节最大角度(rad，约160°) -->
 <xacro:property name="knee_vel" value="17.3"/>            <!-- 膝关节最大角速度(rad/s) -->
-<xacro:property name="knee_eff" value="36"/>              <!-- 膝关节最大力矩(N·m) -->
+<xacro:property name="knee_eff" value="12"/>              <!-- 膝关节最大力矩(N·m) -->
 
 
 </robot>

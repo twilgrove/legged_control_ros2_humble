@@ -14,8 +14,8 @@ namespace dog_controllers
     RCLCPP_INFO(this->get_logger(), "\033[1;36m[ 初始化开始 ] 🚀 TargetTrajectoriesPublisher\033[0m");
 
     std::string pkg_share_path = ament_index_cpp::get_package_share_directory("dog_bringup");
-    std::string taskFile = pkg_share_path + "/config/description/task.info";
-    std::string referenceFile = pkg_share_path + "/config/description/reference.info";
+    std::string taskFile = pkg_share_path + "/config/cdut_dog/description/task.info";
+    std::string referenceFile = pkg_share_path + "/config/cdut_dog/description/reference.info";
 
     loadData::loadCppDataType(referenceFile, "comHeight", COM_HEIGHT_);
     loadData::loadEigenMatrix(referenceFile, "defaultJointState", DEFAULT_JOINT_STATE_);

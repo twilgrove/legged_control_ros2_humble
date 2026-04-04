@@ -18,7 +18,7 @@ def generate_launch_description():
     pkg = get_package_share_directory("dog_bringup")
 
     xacro_file = os.path.join(pkg, "xacro", "cdut_dog", "dog.xacro")
-    urdf_output_dir = os.path.join(pkg, "config", "description")
+    urdf_output_dir = os.path.join(pkg, "config", "cdut_dog", "description")
     urdf_output_file = os.path.join(urdf_output_dir, "dog.urdf")
     world_file = os.path.join(pkg, "config", "dog.world")
     rviz__config_file = os.path.join(pkg, "dog.rviz")
@@ -66,7 +66,7 @@ def generate_launch_description():
             "-y",
             "0",
             "-z",
-            "0.09",
+            "0.04",
             "-timeout",
             "300",
         ],
@@ -113,7 +113,7 @@ def generate_launch_description():
     ld.add_action(gazebo)
     ld.add_action(spawn_entity)
 
-    ld.add_action(controller)
+    # ld.add_action(controller)
     ld.add_action(dog_controller_container)
 
     return ld

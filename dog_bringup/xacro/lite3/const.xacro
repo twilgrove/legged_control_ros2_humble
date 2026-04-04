@@ -2,7 +2,7 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
     <!-- xacro ./dog.xacro > dog.urdf -->
     <xacro:property name="mesh_path" value="package://dog_bringup/meshes/lite3"/>
-    <xacro:property name="cfg" value="${xacro.load_yaml('$(find dog_bringup)/config/robot_controllers.yaml')}"/>
+    <xacro:property name="cfg" value="${xacro.load_yaml('$(find dog_bringup)/config/lite3/robot_controllers.yaml')}"/>
 
 <!-- 躯干参数 -->
 <xacro:property name="torso_mass" value="5.6056"/>        <!-- 躯干质量(kg) -->

@@ -922,7 +922,7 @@
   </gazebo>
   <gazebo>
     <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
-      <parameters>/home/cys/Project_Date/ROS2_workspace/dog_ws/install/dog_bringup/share/dog_bringup/config/robot_controllers.yaml</parameters>
+      <parameters>/home/cys/Project_Date/ROS2_workspace/dog_ws/install/dog_bringup/share/dog_bringup/config/lite3/robot_controllers.yaml</parameters>
       <robot_param>robot_description</robot_param>
       <robot_param_node>robot_state_publisher</robot_param_node>
     </plugin>

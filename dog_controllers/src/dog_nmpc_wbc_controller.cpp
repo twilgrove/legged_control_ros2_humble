@@ -10,9 +10,9 @@ namespace dog_controllers
             node_->get_namespace(),
             node_->get_node_options());
         std::string pkg_share_path = ament_index_cpp::get_package_share_directory("dog_bringup");
-        taskFile = pkg_share_path + "/config/description/task.info";
-        urdfFile = pkg_share_path + "/config/description/dog.urdf";
-        referenceFile = pkg_share_path + "/config/description/reference.info";
+        taskFile = pkg_share_path + "/config/cdut_dog/description/task.info";
+        urdfFile = pkg_share_path + "/config/cdut_dog/description/dog.urdf";
+        referenceFile = pkg_share_path + "/config/cdut_dog/description/reference.info";
         return CallbackReturn::SUCCESS;
     }
 
@@ -114,13 +114,13 @@ namespace dog_controllers
 
             for (int i = 0; i < 4; ++i)
             {
-                scalar_t q_haa_start = (i == 0 || i == 2) ? -0.4 : 0.4;
-                scalar_t q_hfe_start = -1.2;
-                scalar_t q_kfe_start = 2.8;
+                scalar_t q_haa_start = (i == 0 || i == 2) ? 0.07 : -0.07;
+                scalar_t q_hfe_start = -1.79;
+                scalar_t q_kfe_start = 0.5;
 
                 scalar_t q_haa_goal = 0.0;
-                scalar_t q_hfe_goal = -0.8;
-                scalar_t q_kfe_goal = 1.5;
+                scalar_t q_hfe_goal = 0.0;
+                scalar_t q_kfe_goal = 0.0;
 
                 bridge_->legs[i].joints[0]->cmd_pos = q_haa_start + s * (q_haa_goal - q_haa_start);
                 bridge_->legs[i].joints[1]->cmd_pos = q_hfe_start + s * (q_hfe_goal - q_hfe_start);
@@ -141,9 +141,9 @@ namespace dog_controllers
             {
                 state_estimator_->currentObservation_.state.head<6>().setZero();
 
-                state_estimator_->currentObservation_.state(8) = 0.306;
+                state_estimator_->currentObservation_.state(8) = 0.21;
                 nmpc_controller_->start(state_estimator_->currentObservation_);
-                currentState_ = ControlState::NMPC_ACTIVE;
+                // currentState_ = ControlState::NMPC_ACTIVE;
                 RCLCPP_INFO(node_->get_logger(), "\033[1;32m[状态切换] 关节起立完成，NMPC 接管！\033[0m");
             }
         }

@@ -32,19 +32,19 @@ pluginlib_export_plugin_description_file(gazebo_ros2_control dog_hardware.xml)
 # -----------------------------------------------------------------------------
 # 1. 实物驱动插件 (J60_6_hw)
 # -----------------------------------------------------------------------------
-# add_library(J60_6_hw SHARED src/J60_6/J60_6_hw.cpp)
+add_library(J60_6_hw SHARED src/J60_6/J60_6_hw.cpp src/IWT603/wit_c_sdk.c)
 
-# target_include_directories(J60_6_hw PRIVATE include)
+target_include_directories(J60_6_hw PRIVATE include)
 
-# ament_target_dependencies(J60_6_hw hardware_interface rclcpp pluginlib)
+ament_target_dependencies(J60_6_hw hardware_interface rclcpp pluginlib)
 
-# target_link_libraries(J60_6_hw Threads::Threads)
+target_link_libraries(J60_6_hw Threads::Threads)
 
-# pluginlib_export_plugin_description_file(hardware_interface dog_hardware.xml)
+pluginlib_export_plugin_description_file(hardware_interface dog_hardware.xml)
 
 # 安装规则
 install(
-  TARGETS dog_gazebo_hw # J60_6_hw
+  TARGETS dog_gazebo_hw J60_6_hw
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})

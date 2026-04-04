@@ -46,19 +46,15 @@ namespace dog_hardware
     {
         std::string name;
         gazebo::sensors::ImuSensorPtr gazebo_sensor;
-        // 数据缓冲区
         double ori[4];     // x, y, z, w
         double ang_vel[3]; // x, y, z
         double lin_acc[3]; // x, y, z
-        // 协方差
-        std::array<double, 9> ori_cov;
-        std::array<double, 9> ang_vel_cov;
-        std::array<double, 9> lin_acc_cov;
     };
 
     class DogGazeboHW : public gazebo_ros2_control::GazeboSystemInterface
     {
     public:
+        ~DogGazeboHW() override = default;
         CallbackReturn on_init(const hardware_interface::HardwareInfo &info) override;
         bool initSim(
             rclcpp::Node::SharedPtr &node,

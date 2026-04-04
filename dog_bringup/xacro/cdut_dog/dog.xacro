@@ -49,6 +49,36 @@
         <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
 
+    <!-- <link
+    name="lidar_link">
+    <inertial>
+      <origin
+        xyz="3.33066907387547E-15 9.9475983006414E-14 -0.0268465534683788"
+        rpy="0 0 0" />
+      <mass value="0.24" />
+      <inertia
+        ixx="0.000132876366974801"
+        ixy="2.45046624096634E-19"
+        ixz="-1.10460624029042E-19"
+        iyy="0.000108720544937996"
+        iyz="-8.27219261425137E-17"
+        izz="0.000193942390461225" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="${mesh_path}/MID360.STL" />
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="lidar_joint" type="fixed">
+    <origin xyz="0.15556 0.0005199 0.13105" />
+    <parent link="base_link" />
+    <child link="lidar_link" />
+    <axis xyz="0 0 0" />
+  </joint> -->
 
     <xacro:dog_leg name="LF" mirror="1" f_b="1"/>
     <xacro:dog_leg name="LH" mirror="1" f_b="-1"/>
@@ -57,12 +87,9 @@
 
     <ros2_control name="dog_System" type="system">
         <hardware>
-            <!-- <plugin>gazebo_ros2_control/GazeboSystem</plugin> -->
-            <plugin>dog_hardware/DogGazeboHW</plugin>
-            <param name="delay">${cfg['controller_manager']['ros__parameters']['hw_params']['delay']}</param>
-            <param name="imu_accel_var">${cfg['controller_manager']['ros__parameters']['imu_params']['accel']['variance']}</param>
-            <param name="imu_gyro_var">${cfg['controller_manager']['ros__parameters']['imu_params']['gyro']['variance']}</param>
-            <param name="imu_ori_var">${cfg['controller_manager']['ros__parameters']['imu_params']['orientation']['variance']}</param>
+            <!-- <plugin>dog_hardware/DogGazeboHW</plugin>
+            <param name="delay">${cfg['controller_manager']['ros__parameters']['hw_params']['delay']}</param> -->
+            <plugin>dog_hardware/J60_6_hw</plugin>
         </hardware>
 
         <sensor name="imu_sensor">
@@ -76,10 +103,6 @@
             <state_interface name="linear_acceleration.x"/>
             <state_interface name="linear_acceleration.y"/>
             <state_interface name="linear_acceleration.z"/>
-
-            <state_interface name="orientation_covariance"/>
-            <state_interface name="angular_velocity_covariance"/>
-            <state_interface name="linear_acceleration_covariance"/>
         </sensor>
 
         <sensor name="LF_contact_sensor"> <state_interface name="contact"/></sensor>
@@ -97,29 +120,12 @@
       <sensor name="imu_sensor" type="imu">
         <always_on>true</always_on>
         <update_rate>1000</update_rate>
-        <imu>
-          <orientation>
-            <x><noise type="gaussian"><stddev>${cfg['controller_manager']['ros__parameters']['imu_params']['orientation']['variance']**0.5}</stddev></noise></x>
-            <y><noise type="gaussian"><stddev>${cfg['controller_manager']['ros__parameters']['imu_params']['orientation']['variance']**0.5}</stddev></noise></y>
-            <z><noise type="gaussian"><stddev>${cfg['controller_manager']['ros__parameters']['imu_params']['orientation']['variance']**0.5}</stddev></noise></z>
-          </orientation>
-          <linear_acceleration>
-            <x><noise type="gaussian"><stddev>${cfg['controller_manager']['ros__parameters']['imu_params']['accel']['variance']**0.5}</stddev><bias_mean>${cfg['controller_manager']['ros__parameters']['imu_params']['accel']['bias_mean']}</bias_mean></noise></x>
-            <y><noise type="gaussian"><stddev>${cfg['controller_manager']['ros__parameters']['imu_params']['accel']['variance']**0.5}</stddev><bias_mean>${cfg['controller_manager']['ros__parameters']['imu_params']['accel']['bias_mean']}</bias_mean></noise></y>
-            <z><noise type="gaussian"><stddev>${cfg['controller_manager']['ros__parameters']['imu_params']['accel']['variance']**0.5}</stddev><bias_mean>${cfg['controller_manager']['ros__parameters']['imu_params']['accel']['bias_mean']}</bias_mean></noise></z>
-          </linear_acceleration>
-          <angular_velocity>
-            <x><noise type="gaussian"><stddev>${cfg['controller_manager']['ros__parameters']['imu_params']['gyro']['variance']**0.5}</stddev><bias_mean>${cfg['controller_manager']['ros__parameters']['imu_params']['gyro']['bias_mean']}</bias_mean></noise></x>
-            <y><noise type="gaussian"><stddev>${cfg['controller_manager']['ros__parameters']['imu_params']['gyro']['variance']**0.5}</stddev><bias_mean>${cfg['controller_manager']['ros__parameters']['imu_params']['gyro']['bias_mean']}</bias_mean></noise></y>
-            <z><noise type="gaussian"><stddev>${cfg['controller_manager']['ros__parameters']['imu_params']['gyro']['variance']**0.5}</stddev><bias_mean>${cfg['controller_manager']['ros__parameters']['imu_params']['gyro']['bias_mean']}</bias_mean></noise></z>
-          </angular_velocity>
-        </imu>
       </sensor>
     </gazebo>
 
     <gazebo>
         <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
-            <parameters>$(find dog_bringup)/config/robot_controllers.yaml</parameters>
+            <parameters>$(find dog_bringup)/config/cdut_dog/robot_controllers.yaml</parameters>
             <robot_param>robot_description</robot_param>
             <robot_param_node>robot_state_publisher</robot_param_node>
         </plugin>

@@ -55,6 +55,25 @@
     <child link="TORSO"/>
     <origin rpy="0 0 0" xyz="0 0 0"/>
   </joint>
+  <link name="lidar_link">
+    <inertial>
+      <origin rpy="0 0 0" xyz="3.33066907387547E-15 9.9475983006414E-14 -0.0268465534683788"/>
+      <mass value="0.24"/>
+      <inertia ixx="0.000132876366974801" ixy="2.45046624096634E-19" ixz="-1.10460624029042E-19" iyy="0.000108720544937996" iyz="-8.27219261425137E-17" izz="0.000193942390461225"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://dog_bringup/meshes/cdut_dog/MID360.STL"/>
+      </geometry>
+    </visual>
+  </link>
+  <joint name="lidar_joint" type="fixed">
+    <origin xyz="0.15556 0.0005199 0.13105"/>
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <axis xyz="0 0 0"/>
+  </joint>
   <link name="LF_HIP">
     <inertial>
       <origin xyz="0.043209 -0.023751 -0.000382"/>
@@ -105,7 +124,7 @@
     <inertial>
       <origin xyz="0.075085 0.000631 -0.027403"/>
       <mass value="0.084"/>
-      <inertia ixx="7.1e-05" ixy="0" ixz="0" iyy="0.000564" iyz="0" izz="0.000482"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
     </inertial>
     <visual>
       <geometry>
@@ -239,7 +258,7 @@
     <inertial>
       <origin xyz="0.075085 0.000631 -0.027403"/>
       <mass value="0.084"/>
-      <inertia ixx="7.1e-05" ixy="0" ixz="0" iyy="0.000564" iyz="0" izz="0.000482"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
     </inertial>
     <visual>
       <geometry>
@@ -373,7 +392,7 @@
     <inertial>
       <origin xyz="0.075085 0.000631 -0.027403"/>
       <mass value="0.084"/>
-      <inertia ixx="7.1e-05" ixy="0" ixz="0" iyy="0.000564" iyz="0" izz="0.000482"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
     </inertial>
     <visual>
       <geometry>
@@ -507,7 +526,7 @@
     <inertial>
       <origin xyz="0.075085 0.000631 -0.027403"/>
       <mass value="0.084"/>
-      <inertia ixx="7.1e-05" ixy="0" ixz="0" iyy="0.000564" iyz="0" izz="0.000482"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
     </inertial>
     <visual>
       <geometry>
@@ -899,7 +918,7 @@
   </gazebo>
   <gazebo>
     <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
-      <parameters>/home/cys/Project_Date/ROS2_workspace/dog_ws/install/dog_bringup/share/dog_bringup/config/robot_controllers.yaml</parameters>
+      <parameters>/home/cys/Project_Date/ROS2_workspace/dog_ws/install/dog_bringup/share/dog_bringup/config/cdut_dog/robot_controllers.yaml</parameters>
       <robot_param>robot_description</robot_param>
       <robot_param_node>robot_state_publisher</robot_param_node>
     </plugin>

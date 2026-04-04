@@ -23,34 +23,35 @@ enum SendRecvRet
     //接收超时错误返回-2
     //接收epoll错误返回-3
     //接收长度错误返回-4
+    // ID未匹配返回-5
     kNoSendRecvError = 0,
     kSendLengthError = -1,
     kRecvTimeoutError = -2,
     kRecvEpollError = -3,
-    kRecvLengthError = -4
+    kRecvLengthError = -4,
+    kRecvIdNotMatchError = -5
 };
 
 //检查SendRecv函数返回值
-void CheckSendRecvError(uint8_t motor_id, int code)
+// CAN收发错误码 -> 字符串
+const char *SendRecvErrorStr(int code)
 {
     switch (code)
     {
     case kNoSendRecvError:
-        break;
+        return "正常";
     case kSendLengthError:
-        printf("[ERROR] ID为%d的电机 发送长度错误\r\n", (uint32_t)motor_id);
-        break;
+        return "发送长度错误";
     case kRecvTimeoutError:
-        printf("[WARN] ID为%d的电机 接收超时错误\r\n", (uint32_t)motor_id);
-        break;
+        return "接收超时";
     case kRecvEpollError:
-        printf("[ERROR] ID为%d的电机 接收Epoll错误\r\n", (uint32_t)motor_id);
-        break;
+        return "接收Epoll错误";
     case kRecvLengthError:
-        printf("[ERROR] ID为%d的电机 接收长度错误\r\n", (uint32_t)motor_id);
-        break;
+        return "接收长度错误";
+    case kRecvIdNotMatchError:
+        return "接收ID未匹配";
     default:
-        break;
+        return "未知错误";
     }
 }
 
@@ -66,6 +67,7 @@ enum MotorErrorType
     // bit 3: 关节过温标志位
     // bit 4: 驱动板过温标志位
     // bit 5: Can超时标志位
+    // bit 6: 通讯失败标志位
 
     kMotorNoError = 0,
     kOverVoltage = (0x01 << 0),
@@ -73,38 +75,34 @@ enum MotorErrorType
     kOverCurrent = (0x01 << 2),
     kMotorOverTemp = (0x01 << 3),
     kDriverOverTemp = (0x01 << 4),
-    kCanTimeout = (0x01 << 5)
+    kCanTimeout = (0x01 << 5),
+    kCommFailure = (0x01 << 6)
+
 };
 
 //检查关节状态返回值
-void CheckMotorError(uint8_t motor_id, uint16_t code)
+const char *CheckMotorErrorStr(uint16_t code)
 {
-    if (code != kMotorNoError)
+    switch (code)
     {
-        if (code & kOverVoltage)
-        {
-            printf("[错误] ID为%d的电机 过压故障\r\n", (uint32_t)motor_id);
-        }
-        if (code & kUnderVoltage)
-        {
-            printf("[错误] ID为%d的电机 欠压故障\r\n", (uint32_t)motor_id);
-        }
-        if (code & kOverCurrent)
-        {
-            printf("[错误] ID为%d的电机 过流故障\r\n", (uint32_t)motor_id);
-        }
-        if (code & kMotorOverTemp)
-        {
-            printf("[错误] ID为%d的电机 电机本体超温\r\n", (uint32_t)motor_id);
-        }
-        if (code & kDriverOverTemp)
-        {
-            printf("[错误] ID为%d的电机 驱动器超温\r\n", (uint32_t)motor_id);
-        }
-        if (code & kCanTimeout)
-        {
-            printf("[错误] ID为%d的电机 CAN通信超时\r\n", (uint32_t)motor_id);
-        }
+    case kMotorNoError:
+        return "无故障";
+    case kOverVoltage:
+        return "过压故障";
+    case kUnderVoltage:
+        return "欠压故障";
+    case kOverCurrent:
+        return "过流故障";
+    case kMotorOverTemp:
+        return "电机本体超温";
+    case kDriverOverTemp:
+        return "驱动器超温";
+    case kCanTimeout:
+        return "CAN通信超时";
+    case kCommFailure:
+        return "通信失败";
+    default:
+        return "未知故障";
     }
 }
 
@@ -270,7 +268,7 @@ void ParseRecvFrame(const struct can_frame *frame_ret, MotorDATA *data)
     switch (cmd)
     {
     case ENABLE_MOTOR:
-        printf("[信息] 电机ID：%d 使能成功\r\n", (uint32_t)motor_id);
+        // printf("[信息] 电机ID：%d 使能成功\r\n", (uint32_t)motor_id);
         break;
 
     case DISABLE_MOTOR:
@@ -278,7 +276,7 @@ void ParseRecvFrame(const struct can_frame *frame_ret, MotorDATA *data)
         break;
 
     case SET_HOME:
-        printf("[信息] 电机ID：%d 设置零点成功\r\n", (uint32_t)motor_id);
+        // printf("[信息] 电机ID：%d 设置零点成功\r\n", (uint32_t)motor_id);
         break;
 
     case ERROR_RESET:
@@ -311,134 +309,137 @@ typedef struct
 // 创建并初始化电机CAN总线设备
 DrMotorCan *DrMotorCanCreate(const char *can_name, bool is_show_log)
 {
-    // 分配CAN设备结构体内存
+    int flags;
+    struct ifreq ifr;
+    struct sockaddr_can addr;
+    struct epoll_event event;
+
+    // 1. 分配内存并初始化结构体
     DrMotorCan *can = (DrMotorCan *)malloc(sizeof(DrMotorCan));
-    if (can != NULL)
+    if (can == NULL)
+        return NULL;
+    can->can_socket_ = -1;
+    can->epoll_fd_ = -1;
+    can->is_show_log_ = is_show_log;
+
+    // 2. 初始化锁
+    if (pthread_mutex_init(&can->rw_mutex, NULL) != 0)
     {
-        can->is_show_log_ = is_show_log;
-
-        // 创建CAN套接字
-        if ((can->can_socket_ = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0)
-        {
-            printf("[错误] CAN套接字创建失败\r\n");
-            exit(-1);
-        }
-
-        // 设置套接字为非阻塞模式
-        int flags = fcntl(can->can_socket_, F_GETFL, 0);
-        if (flags == -1)
-        {
-            printf("[错误] 获取套接字属性失败\r\n");
-            exit(-1);
-        }
-        flags |= O_NONBLOCK;
-        if (fcntl(can->can_socket_, F_SETFL, flags) == -1)
-        {
-            printf("[错误] 设置非阻塞模式失败\r\n");
-            exit(-1);
-        }
-
-        // 绑定CAN设备名（如can0）
-        struct ifreq ifr;
-        struct sockaddr_can addr;
-        strcpy(ifr.ifr_name, can_name);
-        ioctl(can->can_socket_, SIOCGIFINDEX, &ifr);
-        addr.can_ifindex = ifr.ifr_ifindex;
-        addr.can_family = AF_CAN;
-        if (bind(can->can_socket_, (struct sockaddr *)&addr, sizeof(addr)) < 0)
-        {
-            printf("[错误] 绑定CAN设备失败\r\n");
-            close(can->can_socket_);
-            exit(-1);
-        }
-
-        // 创建epoll实例
-        can->epoll_fd_ = epoll_create1(0);
-        if (can->epoll_fd_ == -1)
-        {
-            printf("[错误] 创建epoll实例失败\r\n");
-            exit(-1);
-        }
-
-        // 将CAN套接字加入epoll监听（监听可读事件）
-        struct epoll_event event;
-        event.events = EPOLLIN;
-        event.data.fd = can->can_socket_;
-        if (epoll_ctl(can->epoll_fd_, EPOLL_CTL_ADD, can->can_socket_, &event) == -1)
-        {
-            printf("[错误] 添加套接字到epoll监听失败\r\n");
-            exit(-1);
-        }
+        free(can);
+        return NULL;
     }
+
+    // 3. 创建 Socket
+    if ((can->can_socket_ = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0)
+    {
+        printf("[错误] CAN套接字创建失败\n");
+        goto failed;
+    }
+
+    // 4. 设置非阻塞
+    flags = fcntl(can->can_socket_, F_GETFL, 0);
+    if (flags == -1 || fcntl(can->can_socket_, F_SETFL, flags | O_NONBLOCK) == -1)
+    {
+        printf("[错误] 设置非阻塞模式失败\n");
+        goto failed;
+    }
+
+    // 5. 绑定设备
+    strcpy(ifr.ifr_name, can_name);
+    if (ioctl(can->can_socket_, SIOCGIFINDEX, &ifr) < 0)
+    {
+        printf("[错误] 获取网卡索引失败\n");
+        goto failed;
+    }
+
+    addr.can_ifindex = ifr.ifr_ifindex;
+    addr.can_family = AF_CAN;
+    if (bind(can->can_socket_, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+    {
+        printf("[错误] 绑定CAN设备失败\n");
+        goto failed;
+    }
+
+    // 6. 创建 epoll
+    can->epoll_fd_ = epoll_create1(0);
+    if (can->epoll_fd_ == -1)
+    {
+        printf("[错误] 创建epoll实例失败\n");
+        goto failed;
+    }
+
+    // 7. 加入监听
+    event.events = EPOLLIN;
+    event.data.fd = can->can_socket_;
+    if (epoll_ctl(can->epoll_fd_, EPOLL_CTL_ADD, can->can_socket_, &event) == -1)
+    {
+        printf("[错误] 添加epoll监听失败\n");
+        goto failed;
+    }
+
     return can;
-};
+
+failed:
+    if (can->can_socket_ >= 0)
+        close(can->can_socket_);
+    if (can->epoll_fd_ >= 0)
+        close(can->epoll_fd_);
+    pthread_mutex_destroy(&can->rw_mutex);
+    free(can);
+    return NULL;
+}
 
 //销毁DrMotorCan实例
 void DrMotorCanDestroy(DrMotorCan *can)
 {
-    close(can->can_socket_);
+    if (can->epoll_fd_ >= 0)
+    {
+        close(can->epoll_fd_);
+        can->epoll_fd_ = -1;
+    }
+    if (can->can_socket_ >= 0)
+    {
+        close(can->can_socket_);
+        can->can_socket_ = -1;
+    }
+
+    pthread_mutex_destroy(&can->rw_mutex);
     free(can);
 }
 
 //使用DrMotorCan进行数据的发送和接收
-int SendRecv(DrMotorCan *can, const MotorCMD *cmd, MotorDATA *data)
+int SendRecv(DrMotorCan *can, const MotorCMD *cmd, MotorDATA *data, int timeout_ms = 3)
 {
     struct can_frame send_frame, recv_frame;
     MakeSendFrame(cmd, &send_frame);
 
-    struct timeval start_time;
-    gettimeofday(&start_time, NULL);
+    // 1. 清除旧缓存：防止断线重连后旧数据堆积导致的 ID 错位
+    struct can_frame junk;
+    while (read(can->can_socket_, &junk, sizeof(junk)) > 0)
+        ;
 
-    if (can->is_show_log_)
-    {
-        printf("[信息] 发送CAN帧 ID: %d, 数据长度: %d, 数据: %d, %d, %d, %d, %d, %d, %d, %d",
-               send_frame.can_id, send_frame.can_dlc,
-               (uint32_t)send_frame.data[0], (uint32_t)send_frame.data[1], (uint32_t)send_frame.data[2], (uint32_t)send_frame.data[3],
-               (uint32_t)send_frame.data[4], (uint32_t)send_frame.data[5], (uint32_t)send_frame.data[6], (uint32_t)send_frame.data[7]);
-    }
-
+    // 2. 发送指令
     pthread_mutex_lock(&can->rw_mutex);
     ssize_t nbytes1 = write(can->can_socket_, &send_frame, sizeof(send_frame));
     pthread_mutex_unlock(&can->rw_mutex);
     if (nbytes1 != sizeof(send_frame))
-    {
         return kSendLengthError;
-    }
 
+    // 3. 等待并执行精准 ID 匹配
     struct epoll_event events;
-    int epoll_wait_result = epoll_wait(can->epoll_fd_, &events, 5, 3);
-    if (epoll_wait_result == 0)
-    {
+    if (epoll_wait(can->epoll_fd_, &events, 1, timeout_ms) <= 0)
         return kRecvTimeoutError;
-    }
-    else if (epoll_wait_result == -1)
-    {
-        return kRecvEpollError;
-    }
-    else
-    {
-        pthread_mutex_lock(&can->rw_mutex);
-        ssize_t nbytes2 = read(can->can_socket_, &recv_frame, sizeof(recv_frame));
-        pthread_mutex_unlock(&can->rw_mutex);
-        if (nbytes2 != sizeof(recv_frame))
-        {
-            return kRecvLengthError;
-        }
 
-        if (can->is_show_log_)
-        {
-            printf("[信息] 接收CAN帧 ID: %d, 数据长度: %d, 数据: %d, %d, %d, %d, %d, %d, %d, %d\r\n",
-                   recv_frame.can_id, recv_frame.can_dlc,
-                   (uint32_t)recv_frame.data[0], (uint32_t)recv_frame.data[1], (uint32_t)recv_frame.data[2], (uint32_t)recv_frame.data[3],
-                   (uint32_t)recv_frame.data[4], (uint32_t)recv_frame.data[5], (uint32_t)recv_frame.data[6], (uint32_t)recv_frame.data[7]);
-            struct timeval end_time;
-            gettimeofday(&end_time, NULL);
-            long long duration_us = (end_time.tv_sec - start_time.tv_sec) * 1000000LL +
-                                    (end_time.tv_usec - start_time.tv_usec);
-            printf("[信息] 收发耗时: %lld 微秒\r\n", duration_us);
-        }
+    pthread_mutex_lock(&can->rw_mutex);
+    ssize_t nbytes2 = read(can->can_socket_, &recv_frame, sizeof(recv_frame));
+    pthread_mutex_unlock(&can->rw_mutex);
 
-        ParseRecvFrame(&recv_frame, data);
-        return kNoSendRecvError;
-    }
+    if (nbytes2 != sizeof(recv_frame))
+        return kRecvLengthError;
+
+    if ((recv_frame.can_id & 0x0F) != cmd->motor_id_)
+        return kRecvIdNotMatchError;
+
+    ParseRecvFrame(&recv_frame, data);
+    return kNoSendRecvError;
 }

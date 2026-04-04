@@ -1,13 +1,13 @@
-#pragma once
-
 #include <atomic>
 #include <thread>
+#include <mutex>
 #include <vector>
+#include <stdint.h>
 #include <string>
 #include <array>
 #include "hardware_interface/system_interface.hpp"
 #include "rclcpp/rclcpp.hpp"
-// 包含你的 SDK
+
 #include "dog_hardware/J60_6/deep_motor_sdk.h"
 
 namespace dog_hardware
@@ -19,25 +19,35 @@ namespace dog_hardware
     {
         std::string name;
         int motor_id;
-        double kp, kd, ff, pos_des, vel_des;
-        double drv_temp, mtr_temp, err_code, pos, vel, eff;
+        double kp = 0.0, kd = 0.0, ff = 0.0, pos_des = 0.0, vel_des = 0.0;
+        double drv_temp = 0.0, mtr_temp = 0.0, err_code = 0.0, pos = 0.0, vel = 0.0, eff = 0.0;
         MotorCMD *cmd_obj;
         MotorDATA *data_obj;
+        MotorDATA *temp_data_obj;
+        std::mutex cmd_mutex_;
+        std::mutex data_mutex_;
+        double joint_sign;
     };
 
     struct CanBusWorker
     {
         std::string interface;
         DrMotorCan *can_handle = nullptr;
+        std::mutex can_mutex_;
         std::vector<JointData *> joints;
         std::thread thread_handle;
-        std::atomic<bool> is_running{false};
-        std::atomic<bool> is_online{false};
+        std::atomic<bool> is_running{true};
     };
-
+    struct ImuData
+    {
+        double ori[4];     // x, y, z, w
+        double ang_vel[3]; // x, y, z
+        double lin_acc[3]; // x, y, z
+    };
     class J60_6_hw : public hardware_interface::SystemInterface
     {
     public:
+        ~J60_6_hw() override = default;
         CallbackReturn on_init(const hardware_interface::HardwareInfo &info) override;
         CallbackReturn on_activate(const rclcpp_lifecycle::State &previous_state) override;
         CallbackReturn on_deactivate(const rclcpp_lifecycle::State &previous_state) override;
@@ -51,19 +61,21 @@ namespace dog_hardware
     private:
         // 4路 CAN
         std::array<CanBusWorker, 4> can_workers_;
+        std::vector<std::unique_ptr<JointData>> all_joints_;
+
         // 1路 IMU
         std::thread imu_thread_;
         std::atomic<bool> imu_running_{false};
+        ImuData Imudata, temp_ImuData;
+        std::mutex imu_mutex_;
+        float fAcc[3], fGyro[3], fq[4];
 
-        struct
-        {
-            std::atomic<double> ori[4], ang_vel[3], lin_acc[3];
-        } shared_imu_;
+        double dummy_contact[4] = {0.0, 0.0, 0.0, 0.0};
+
+        bool overall_success = true;
 
         void CanWorkerFunc(int bus_idx);
         void ImuWorkerFunc(std::string port);
-
-        std::vector<JointData> all_joints_;
     };
 
 } // namespace dog_hardware

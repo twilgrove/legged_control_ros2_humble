@@ -1,0 +1,59 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 1000  # Hz
+
+    hw_params:
+      is_sim: true
+      delay: 0.009 # 仿真通信延迟，单位秒
+        
+    DogNmpcWbcController:
+      type: dog_controllers/DogNmpcWbcController
+      # type: dog_controllers/DogNmpcWbcController_God
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+    effort_controller:
+      type: effort_controllers/JointGroupEffortController
+    imu_sensor_broadcaster:
+      type: imu_sensor_broadcaster/IMUSensorBroadcaster
+      
+DogNmpcWbcController:
+  ros__parameters:
+    threshold: 0.005
+    joints:
+      - LF_HAA
+      - LF_HFE
+      - LF_KFE
+      - LH_HAA
+      - LH_HFE
+      - LH_KFE
+      - RF_HAA
+      - RF_HFE
+      - RF_KFE
+      - RH_HAA
+      - RH_HFE
+      - RH_KFE
+    contacts:
+      - LF_contact_sensor
+      - RF_contact_sensor
+      - LH_contact_sensor
+      - RH_contact_sensor
+
+joint_state_broadcaster:
+  ros__parameters:
+    joints:
+      - LF_HAA
+      - LF_HFE
+      - LF_KFE
+      - LH_HAA
+      - LH_HFE
+      - LH_KFE
+      - RF_HAA
+      - RF_HFE
+      - RF_KFE
+      - RH_HAA
+      - RH_HFE
+      - RH_KFE
+imu_sensor_broadcaster:
+  ros__parameters:
+    sensor_name: "imu_sensor"
+    frame_id: "base_link"
