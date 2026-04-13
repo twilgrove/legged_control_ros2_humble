@@ -114,37 +114,51 @@ namespace dog_controllers
 
             for (int i = 0; i < 4; ++i)
             {
-                scalar_t q_haa_start = (i == 0 || i == 2) ? 0.07 : -0.07;
-                scalar_t q_hfe_start = -1.79;
-                scalar_t q_kfe_start = 0.5;
-
+                // 真机趴下：0，0，0；真机半站：0，1.45，0
+                // 仿真趴下：0，-1.8，0.5；仿真半站：0，-0.35，0.5
+                // --- 目标角度定义 ---
                 scalar_t q_haa_goal = 0.0;
-                scalar_t q_hfe_goal = 0.0;
+                scalar_t q_hfe_start = 0.0;
+                scalar_t q_hfe_goal = 1.45;
                 scalar_t q_kfe_goal = 0.0;
 
-                bridge_->legs[i].joints[0]->cmd_pos = q_haa_start + s * (q_haa_goal - q_haa_start);
-                bridge_->legs[i].joints[1]->cmd_pos = q_hfe_start + s * (q_hfe_goal - q_hfe_start);
-                bridge_->legs[i].joints[2]->cmd_pos = q_kfe_start + s * (q_kfe_goal - q_kfe_start);
+                // --- 插值逻辑 ---
+                // 1. HAA
+                bridge_->legs[i].joints[0]->cmd_pos = q_haa_goal;
 
-                bridge_->legs[i].joints[0]->cmd_kp = 50.0;
-                bridge_->legs[i].joints[1]->cmd_kp = 50.0;
-                bridge_->legs[i].joints[2]->cmd_kp = 50.0;
-                bridge_->legs[i].joints[0]->cmd_kd = 3.0;
-                bridge_->legs[i].joints[1]->cmd_kd = 3.0;
-                bridge_->legs[i].joints[2]->cmd_kd = 3.0;
+                // 2. HFE
+                // bridge_->legs[i].joints[1]->cmd_pos = q_hfe_start + s * (q_hfe_goal - q_hfe_start);
+                bridge_->legs[i].joints[1]->cmd_pos = q_hfe_start;
+
+                // 3. KFE
+                bridge_->legs[i].joints[2]->cmd_pos = q_kfe_goal;
+
+                // --- PD 参数设置
+                bridge_->legs[i].joints[0]->cmd_kp = 20.0;
+                bridge_->legs[i].joints[1]->cmd_kp = 10.0;
+                bridge_->legs[i].joints[2]->cmd_kp = 10.0;
+
+                bridge_->legs[i].joints[0]->cmd_kd = 2.0;
+                bridge_->legs[i].joints[1]->cmd_kd = 2.0;
+                bridge_->legs[i].joints[2]->cmd_kd = 2.0;
+
                 bridge_->legs[i].joints[0]->cmd_ff = 0.0;
                 bridge_->legs[i].joints[1]->cmd_ff = 0.0;
                 bridge_->legs[i].joints[2]->cmd_ff = 0.0;
             }
 
-            if (phase >= 1.0 && state_estimator_->currentObservation_.state(8) > 0.1)
+            // --- 切换逻辑 ---
+            if (phase >= 1.0)
             {
-                state_estimator_->currentObservation_.state.head<6>().setZero();
+                if (state_estimator_->currentObservation_.state(8) > 0.2)
+                {
+                    state_estimator_->currentObservation_.state.head<6>().setZero();
+                    state_estimator_->currentObservation_.state(8) = 0.25;
 
-                state_estimator_->currentObservation_.state(8) = 0.21;
-                nmpc_controller_->start(state_estimator_->currentObservation_);
-                // currentState_ = ControlState::NMPC_ACTIVE;
-                RCLCPP_INFO(node_->get_logger(), "\033[1;32m[状态切换] 关节起立完成，NMPC 接管！\033[0m");
+                    nmpc_controller_->start(state_estimator_->currentObservation_);
+                    // currentState_ = ControlState::NMPC_ACTIVE; // 记得取消注释
+                    RCLCPP_INFO(node_->get_logger(), "\033[1;32m[状态切换] HFE 摆动起立完成，NMPC 启动！\033[0m");
+                }
             }
         }
         // --- 状态 2：NMPC + WBC 激活阶段 ---
@@ -175,29 +189,29 @@ namespace dog_controllers
         bridge_->write_to_hw();
         mainLoopTimer_.endTimer();
 
-        RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 300,
-                             "\n\033[1;36m[ 🤖 机器人综合诊断报告 ] >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\033[0m"
-                             "\n\033[1;33m[ 1. 物理状态 ]\033[0m"
-                             "\n  实测高度 (Z) : \033[1;32m%.3f\033[0m m  |  实测速度 (Vz) : %.3f m/s"
-                             "\n  当前模式     : %s"
-                             "\n\033[1;33m[ 2. NMPC 规划 ]\033[0m"
-                             "\n  最终目标高度 : \033[1;35m%.3f\033[0m m  |  当前规划高度 : %.3f m" // 修改这里
-                             "\n  步态模式     : %zu (15=全支撑)"
-                             "\n  期望力(Fz)   : LF:%.1f, RF:%.1f, LH:%.1f, RH:%.1f N"
-                             "\n  LF 关节参考   : HAA:%.2f, HFE:%.2f, KFE:%.2f rad"
-                             "\n\033[1;33m[ 3. 控制性能 ]\033[0m"
-                             "\n  主循环平均耗时 : \033[1;32m%.3f\033[0m ms  |  运行总数 : %d 次"
-                             "\n\033[1;36m<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\033[0m",
-                             state_estimator_->currentObservation_.state(8),
-                             state_estimator_->currentObservation_.state(2),
-                             (currentState_ == ControlState::JOINT_STANDUP ? "\033[1;35m关节起立中\033[0m" : "\033[1;32mNMPC激活\033[0m"),
-                             0.306,
-                             optimizedState(8),
-                             plannedMode,
-                             optimizedInput(2), optimizedInput(5), optimizedInput(8), optimizedInput(11),
-                             optimizedState(12), optimizedState(13), optimizedState(14),
-                             mainLoopTimer_.getAverageInMilliseconds(),
-                             mainLoopTimer_.getNumTimedIntervals());
+        // RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 300,
+        //                      "\n\033[1;36m[ 🤖 机器人综合诊断报告 ] >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\033[0m"
+        //                      "\n\033[1;33m[ 1. 物理状态 ]\033[0m"
+        //                      "\n  实测高度 (Z) : \033[1;32m%.3f\033[0m m  |  实测速度 (Vz) : %.3f m/s"
+        //                      "\n  当前模式     : %s"
+        //                      "\n\033[1;33m[ 2. NMPC 规划 ]\033[0m"
+        //                      "\n  最终目标高度 : \033[1;35m%.3f\033[0m m  |  当前规划高度 : %.3f m" // 修改这里
+        //                      "\n  步态模式     : %zu (15=全支撑)"
+        //                      "\n  期望力(Fz)   : LF:%.1f, RF:%.1f, LH:%.1f, RH:%.1f N"
+        //                      "\n  LF 关节参考   : HAA:%.2f, HFE:%.2f, KFE:%.2f rad"
+        //                      "\n\033[1;33m[ 3. 控制性能 ]\033[0m"
+        //                      "\n  主循环平均耗时 : \033[1;32m%.3f\033[0m ms  |  运行总数 : %d 次"
+        //                      "\n\033[1;36m<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\033[0m",
+        //                      state_estimator_->currentObservation_.state(8),
+        //                      state_estimator_->currentObservation_.state(2),
+        //                      (currentState_ == ControlState::JOINT_STANDUP ? "\033[1;35m关节起立中\033[0m" : "\033[1;32mNMPC激活\033[0m"),
+        //                      0.306,
+        //                      optimizedState(8),
+        //                      plannedMode,
+        //                      optimizedInput(2), optimizedInput(5), optimizedInput(8), optimizedInput(11),
+        //                      optimizedState(12), optimizedState(13), optimizedState(14),
+        //                      mainLoopTimer_.getAverageInMilliseconds(),
+        //                      mainLoopTimer_.getNumTimedIntervals());
 
         return controller_interface::return_type::OK;
     }

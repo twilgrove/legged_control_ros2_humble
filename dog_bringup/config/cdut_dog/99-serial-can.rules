@@ -17,6 +17,8 @@
 #sudo ip link set can_lf up type can bitrate 1000000
 #sudo ip link set can_rf up type can bitrate 1000000
 #sudo ip link set can_rh up type can bitrate 1000000
+#sudo visudo
+#name ALL=(ALL) NOPASSWD: /usr/sbin/ip
 
 #IMU 串口
 SUBSYSTEM=="tty", ATTRS{idVendor}=="19f5", ATTRS{idProduct}=="5740", SYMLINK+="ttyimu"

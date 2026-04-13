@@ -19,7 +19,7 @@ namespace dog_hardware
     {
         std::string name;
         int motor_id;
-        double kp = 0.0, kd = 0.0, ff = 0.0, pos_des = 0.0, vel_des = 0.0;
+        double pos_des = 0.0, vel_des = 0.0, kp = 0.0, kd = 0.0, ff = 0.0;
         double drv_temp = 0.0, mtr_temp = 0.0, err_code = 0.0, pos = 0.0, vel = 0.0, eff = 0.0;
         MotorCMD *cmd_obj;
         MotorDATA *data_obj;

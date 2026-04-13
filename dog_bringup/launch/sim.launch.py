@@ -54,8 +54,6 @@ def generate_launch_description():
     spawn_entity = Node(
         package="gazebo_ros",
         executable="spawn_entity.py",
-        # respawn=True,
-        # respawn_delay=2.0,
         arguments=[
             "-topic",
             "robot_description",
@@ -106,14 +104,21 @@ def generate_launch_description():
         output="screen",
     )
 
+    joint_state_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["joint_state_broadcaster"],
+    )
+
     ld = LaunchDescription()
 
     ld.add_action(generate_urdf)
     ld.add_action(rviz_node)
     ld.add_action(gazebo)
     ld.add_action(spawn_entity)
+    ld.add_action(joint_state_broadcaster_spawner)
 
-    # ld.add_action(controller)
+    ld.add_action(controller)
     ld.add_action(dog_controller_container)
 
     return ld

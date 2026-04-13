@@ -74,6 +74,50 @@ static bool is_can_interface_exist(const char *can_name)
     return stat(path, &st) == 0; // 存在返回 1，不存在返回 0
 }
 
+bool is_can_interface_up(const std::string &interface)
+{
+    struct ifreq ifr;
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0)
+        return false;
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, interface.c_str(), IFNAMSIZ - 1);
+
+    if (ioctl(sock, SIOCGIFFLAGS, &ifr) < 0)
+    {
+        close(sock);
+        return false; // 网卡可能不存在
+    }
+    close(sock);
+    return (ifr.ifr_flags & IFF_UP) && (ifr.ifr_flags & IFF_RUNNING);
+}
+bool reset_can_interface(const std::string &interface, int bitrate = 1000000)
+{
+    // 1. 构造 Shell 指令
+    std::string cmd_down = "sudo ip link set " + interface + " down";
+    std::string cmd_up = "sudo ip link set " + interface + " up type can bitrate " + std::to_string(bitrate);
+    std::string cmd_tx = "sudo ip link set " + interface + " txqueuelen 1000";
+
+    // 2. 执行 Down
+    if (std::system(cmd_down.c_str()) != 0)
+    {
+        return false;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    // 3. 执行 Up
+    if (std::system(cmd_up.c_str()) != 0)
+    {
+        return false;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    // 4. 设置 txqueuelen
+    std::system(cmd_tx.c_str());
+
+    return true;
+}
 // 定义一个全局或静态的清理标记
 static std::atomic<bool> g_force_exit{false};
 
@@ -154,7 +198,24 @@ namespace dog_hardware
 
         for (int i = 0; i < 4; ++i)
         {
-            can_workers_[i].can_handle = DrMotorCanCreate(can_workers_[i].interface.c_str(), false);
+            if (!is_can_interface_exist(can_workers_[i].interface.c_str()))
+            {
+                RCLCPP_ERROR(rclcpp::get_logger("J60_6_hw"), "❌ 未找到 CAN 接口: %s", can_workers_[i].interface.c_str());
+                continue;
+            }
+            else
+            {
+                if (!reset_can_interface(can_workers_[i].interface))
+                {
+                    RCLCPP_ERROR(rclcpp::get_logger("J60_6_hw"), "❌ 激活 CAN 接口 %s 失败", can_workers_[i].interface.c_str());
+                    continue;
+                }
+                else
+                {
+                    RCLCPP_INFO(rclcpp::get_logger("J60_6_hw"), "✅ 激活 CAN 接口 %s 成功", can_workers_[i].interface.c_str());
+                    can_workers_[i].can_handle = DrMotorCanCreate(can_workers_[i].interface.c_str(), false);
+                }
+            }
 
             if (can_workers_[i].can_handle)
             {
@@ -183,6 +244,7 @@ namespace dog_hardware
                     {
                         RCLCPP_ERROR(rclcpp::get_logger("J60_6_hw"), "❌ 电机 [%s] 设零失败! %s", j->name.c_str(), SendRecvErrorStr(ret));
                         overall_success = false;
+                        can_workers_[i].is_running = false;
                         continue;
                     }
 
@@ -204,6 +266,7 @@ namespace dog_hardware
                     if (!joint_success)
                     {
                         RCLCPP_ERROR(rclcpp::get_logger("J60_6_hw"), "❌ 电机 [%s] 使能失败! %s", j->name.c_str(), SendRecvErrorStr(ret));
+                        can_workers_[i].is_running = false;
                         overall_success = false;
                     }
                 }
@@ -290,96 +353,95 @@ namespace dog_hardware
     void J60_6_hw::CanWorkerFunc(int bus_idx)
     {
         auto &bus = can_workers_[bus_idx];
-        uint32_t t1s = 0, t2s = 0;
+        uint32_t t1s = 0, error_cnt = 0;
         int rett = kNoSendRecvError;
         auto last_time = std::chrono::steady_clock::now();
         while (bus.is_running)
         {
-            // if (t2s++ >= 1000)
-            // {
-            //     t2s = 0;
-            //     if (!is_can_interface_exist(bus.interface.c_str()))
-            //     {
-            //         RCLCPP_ERROR(rclcpp::get_logger("J60_6_hw"),
-            //                      "🚨 CAN 网卡 %s 不在系统里！已掉线！准备重连.",
-            //                      bus.interface.c_str());
-
-            //         // 销毁旧句柄
-            //         if (bus.can_handle)
-            //         {
-            //             DrMotorCanDestroy(bus.can_handle);
-            //             bus.can_handle = nullptr;
-            //         }
-
-            //         // 等待网卡恢复
-            //         while (!is_can_interface_exist(bus.interface.c_str()) && bus.is_running)
-            //         {
-            //             std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            //             RCLCPP_WARN(rclcpp::get_logger("J60_6_hw"),
-            //                         "等待 CAN 网卡 %s 恢复...", bus.interface.c_str());
-            //         }
-
-            //         // 重新创建 CAN
-            //         if (is_can_interface_exist(bus.interface.c_str()))
-            //         {
-            //             bus.can_handle = DrMotorCanCreate(bus.interface.c_str(), false);
-            //             RCLCPP_INFO(rclcpp::get_logger("J60_6_hw"),
-            //                         "✅ CAN 网卡 %s 恢复，重新创建成功", bus.interface.c_str());
-
-            //             // 重新使能电机
-            //             for (auto *j : bus.joints)
-            //             {
-            //                 std::lock_guard<std::mutex> cmd_lock(j->cmd_mutex_);
-            //                 SetNormalCMD(j->cmd_obj, j->motor_id, ENABLE_MOTOR);
-            //                 rett = SendRecv(bus.can_handle, j->cmd_obj, j->data_obj);
-            //                 if (rett == kNoSendRecvError)
-            //                 {
-            //                     RCLCPP_INFO(rclcpp::get_logger("J60_6_hw"),
-            //                                 "电机 %s 重新使能", j->name.c_str());
-            //                 }
-            //                 else
-            //                 {
-            //                     RCLCPP_ERROR(rclcpp::get_logger("J60_6_hw"),
-            //                                  "电机 %s 重新使能失败!!! 错误: %s", j->name.c_str(), SendRecvErrorStr(rett));
-            //                 }
-            //             }
-            //         }
-            //     }
-            // }
-
-            if (bus.can_handle != nullptr)
+            t1s++;
+            for (auto *j : bus.joints)
             {
-                t1s++;
-
-                for (auto *j : bus.joints)
+                MotorCMD temp_cmd;
                 {
-                    MotorCMD temp_cmd;
-                    {
-                        std::lock_guard<std::mutex> lock(j->cmd_mutex_);
-                        temp_cmd = *(j->cmd_obj);
-                    }
+                    std::lock_guard<std::mutex> lock(j->cmd_mutex_);
+                    temp_cmd = *(j->cmd_obj);
+                }
 
-                    if (t1s % 1000 == 0)
-                    {
-                        SetNormalCMD(&temp_cmd, j->motor_id, GET_STATUS_WORD);
-                        rett = SendRecv(bus.can_handle, &temp_cmd, j->temp_data_obj);
-                    }
-                    else
-                        rett = SendRecv(bus.can_handle, &temp_cmd, j->temp_data_obj);
+                if (t1s % 1000 == 0)
+                {
+                    SetNormalCMD(&temp_cmd, j->motor_id, GET_STATUS_WORD);
+                    rett = SendRecv(bus.can_handle, &temp_cmd, j->temp_data_obj);
+                }
+                else
+                    rett = SendRecv(bus.can_handle, &temp_cmd, j->temp_data_obj);
 
-                    if (rett == kNoSendRecvError)
-                    {
-                        std::lock_guard<std::mutex> lock(j->data_mutex_);
-                        *(j->data_obj) = *(j->temp_data_obj);
-                    }
-                    else
-                    {
-                        RCLCPP_ERROR(rclcpp::get_logger("J60_6_hw"),
-                                     "电机 %s 通信失败", j->name.c_str());
+                if (rett == kNoSendRecvError)
+                {
+                    std::lock_guard<std::mutex> lock(j->data_mutex_);
+                    *(j->data_obj) = *(j->temp_data_obj);
+                }
+                else
+                {
+                    RCLCPP_ERROR(rclcpp::get_logger("J60_6_hw"),
+                                 "电机 %s 通信失败", j->name.c_str());
+                    error_cnt++;
+                    std::lock_guard<std::mutex> lock(j->data_mutex_);
+                    j->data_obj->error_ = 44;
+                }
+            }
 
-                        std::lock_guard<std::mutex> lock(j->data_mutex_);
-                        j->data_obj->error_ = 44;
-                    }
+            if (t1s % 100 == 0 && error_cnt >= 20)
+            {
+                error_cnt = 0;
+                if (!is_can_interface_up(bus.interface))
+                {
+                    RCLCPP_ERROR(rclcpp::get_logger("J60_6_hw"),
+                                 "🚨 CAN 网卡 %s 不在系统里！已掉线！",
+                                 bus.interface.c_str());
+                    DrMotorCanDestroy(bus.can_handle);
+                    bus.can_handle = nullptr;
+                    return;
+                    /*USB转CAN模块会卡死，无法重启
+                    // // 销毁旧句柄
+                    // if (bus.can_handle)
+                    // {
+                    //     DrMotorCanDestroy(bus.can_handle);
+                    //     bus.can_handle = nullptr;
+                    // }
+
+                    // // 等待网卡恢复
+                    // while (!is_can_interface_exist(bus.interface.c_str()) && bus.is_running)
+                    // {
+                    //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                    //     RCLCPP_WARN(rclcpp::get_logger("J60_6_hw"),
+                    //                 "等待 CAN 网卡 %s 恢复...", bus.interface.c_str());
+                    // }
+
+                    // // 重新创建 CAN
+                    // if (is_can_interface_exist(bus.interface.c_str()) && reset_can_interface(bus.interface))
+                    // {
+                    //     bus.can_handle = DrMotorCanCreate(bus.interface.c_str(), false);
+                    //     RCLCPP_INFO(rclcpp::get_logger("J60_6_hw"),
+                    //                 "✅ CAN 网卡 %s 恢复，重新创建成功", bus.interface.c_str());
+
+                    //     // 重新使能电机
+                    //     for (auto *j : bus.joints)
+                    //     {
+                    //         std::lock_guard<std::mutex> cmd_lock(j->cmd_mutex_);
+                    //         SetNormalCMD(j->cmd_obj, j->motor_id, ENABLE_MOTOR);
+                    //         rett = SendRecv(bus.can_handle, j->cmd_obj, j->data_obj);
+                    //         if (rett == kNoSendRecvError)
+                    //         {
+                    //             RCLCPP_INFO(rclcpp::get_logger("J60_6_hw"),
+                    //                         "电机 %s 重新使能", j->name.c_str());
+                    //         }
+                    //         else
+                    //         {
+                    //             RCLCPP_ERROR(rclcpp::get_logger("J60_6_hw"),
+                    //                          "电机 %s 重新使能失败!!! 错误: %s", j->name.c_str(), SendRecvErrorStr(rett));
+                    //         }
+                    //     }
+                    // }*/
                 }
             }
 

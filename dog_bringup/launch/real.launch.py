@@ -89,7 +89,8 @@ def generate_launch_description():
     ld.add_action(robot_state_publisher)
     ld.add_action(joint_state_broadcaster_spawner)
     ld.add_action(imu_broadcaster_spawner)
-    # ld.add_action(dog_controller_spawner)
+    ld.add_action(dog_controller_spawner)
+
     # ld.add_action(dog_controller_container)
     # ld.add_action(rviz_node)
 
