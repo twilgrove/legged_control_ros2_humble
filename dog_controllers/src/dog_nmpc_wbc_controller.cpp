@@ -127,15 +127,14 @@ namespace dog_controllers
                 bridge_->legs[i].joints[0]->cmd_pos = q_haa_goal;
 
                 // 2. HFE
-                // bridge_->legs[i].joints[1]->cmd_pos = q_hfe_start + s * (q_hfe_goal - q_hfe_start);
-                bridge_->legs[i].joints[1]->cmd_pos = q_hfe_start;
+                bridge_->legs[i].joints[1]->cmd_pos = q_hfe_start + s * (q_hfe_goal - q_hfe_start);
 
                 // 3. KFE
                 bridge_->legs[i].joints[2]->cmd_pos = q_kfe_goal;
 
                 // --- PD 参数设置
                 bridge_->legs[i].joints[0]->cmd_kp = 20.0;
-                bridge_->legs[i].joints[1]->cmd_kp = 10.0;
+                bridge_->legs[i].joints[1]->cmd_kp = 20.0;
                 bridge_->legs[i].joints[2]->cmd_kp = 10.0;
 
                 bridge_->legs[i].joints[0]->cmd_kd = 2.0;
