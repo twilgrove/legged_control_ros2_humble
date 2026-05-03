@@ -86,7 +86,7 @@
 <xacro:property name="knee_min" value="-2"/>           <!-- 膝关节最小角度(rad，约30°) -->
 <xacro:property name="knee_max" value="0.5"/>           <!-- 膝关节最大角度(rad，约160°) -->
 <xacro:property name="knee_vel" value="17.3"/>            <!-- 膝关节最大角速度(rad/s) -->
-<xacro:property name="knee_eff" value="12"/>              <!-- 膝关节最大力矩(N·m) -->
+<xacro:property name="knee_eff" value="30"/>              <!-- 膝关节最大力矩(N·m) -->
 
 
 </robot>

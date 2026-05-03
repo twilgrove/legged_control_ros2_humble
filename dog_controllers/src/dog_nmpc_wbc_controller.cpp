@@ -2,6 +2,53 @@
 
 namespace dog_controllers
 {
+    namespace
+    {
+        std::array<scalar_t, 3> readVector3Param(
+            const rclcpp_lifecycle::LifecycleNode::SharedPtr &node,
+            const std::string &name,
+            const std::array<scalar_t, 3> &fallback)
+        {
+            rclcpp::Parameter parameter;
+            if (!node->get_parameter(name, parameter))
+            {
+                return fallback;
+            }
+
+            std::array<scalar_t, 3> result = fallback;
+            if (parameter.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY)
+            {
+                const auto values = parameter.as_double_array();
+                if (values.size() == result.size())
+                {
+                    for (size_t i = 0; i < result.size(); ++i)
+                    {
+                        result[i] = values[i];
+                    }
+                    return result;
+                }
+            }
+            else if (parameter.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY)
+            {
+                const auto values = parameter.as_integer_array();
+                if (values.size() == result.size())
+                {
+                    for (size_t i = 0; i < result.size(); ++i)
+                    {
+                        result[i] = static_cast<scalar_t>(values[i]);
+                    }
+                    return result;
+                }
+            }
+
+            RCLCPP_WARN(
+                node->get_logger(),
+                "参数 %s 应为长度为 3 的数组，继续使用默认值。",
+                name.c_str());
+            return fallback;
+        }
+    }
+
     CallbackReturn DogNmpcWbcController::on_init()
     {
         node_ = get_node();
@@ -18,6 +65,33 @@ namespace dog_controllers
 
     CallbackReturn DogNmpcWbcController::on_configure(const rclcpp_lifecycle::State &)
     {
+        node_->get_parameter("is_sim", isSim_);
+        node_->get_parameter("use_gait_contact", useGaitContact_);
+
+        double standUpDuration = standUpDuration_;
+        if (node_->get_parameter("standup_phase_duration", standUpDuration))
+        {
+            if (standUpDuration > 0.0)
+            {
+                standUpDuration_ = standUpDuration;
+            }
+            else
+            {
+                RCLCPP_WARN(node_->get_logger(), "standup_phase_duration 必须大于 0，继续使用默认值 %.2f。", standUpDuration_);
+            }
+        }
+
+        standUpPhase1Start_ = readVector3Param(node_, "standup_phase1_start", standUpPhase1Start_);
+        standUpPhase1Goal_ = readVector3Param(node_, "standup_phase1_goal", standUpPhase1Goal_);
+        standUpPhase2Goal_ = readVector3Param(node_, "standup_phase2_goal", standUpPhase2Goal_);
+        standUpKp_ = readVector3Param(node_, "standup_kp", standUpKp_);
+        standUpKd_ = readVector3Param(node_, "standup_kd", standUpKd_);
+
+        RCLCPP_INFO(
+            node_->get_logger(),
+            "DogNmpcWbcController 模式: %s，触地来源: %s。",
+            isSim_ ? "sim" : "real",
+            useGaitContact_ ? "gait schedule" : "hardware sensor");
         return CallbackReturn::SUCCESS;
     }
 
@@ -89,15 +163,17 @@ namespace dog_controllers
     {
         mainLoopTimer_.startTimer();
         bridge_->read_from_hw();
-        /*----------------无足端触地传感器----------------*/
-        auto contactFlags = modeNumber2StanceLeg(nmpc_controller_->mpcMrtInterface_->getReferenceManager()
-                                                     .getModeSchedule()
-                                                     .modeAtTime(state_estimator_->currentObservation_.time));
-        bridge_->legs[0].contact = contactFlags[0] ? 1.0 : 0.0; // LF
-        bridge_->legs[2].contact = contactFlags[1] ? 1.0 : 0.0; // RF
-        bridge_->legs[1].contact = contactFlags[2] ? 1.0 : 0.0; // LH
-        bridge_->legs[3].contact = contactFlags[3] ? 1.0 : 0.0; // RH
-        /*-----------------------------------------------*/
+
+        if (useGaitContact_)
+        {
+            auto contactFlags = modeNumber2StanceLeg(nmpc_controller_->mpcMrtInterface_->getReferenceManager()
+                                                         .getModeSchedule()
+                                                         .modeAtTime(state_estimator_->currentObservation_.time));
+            bridge_->legs[0].contact = contactFlags[0] ? 1.0 : 0.0; // LF
+            bridge_->legs[2].contact = contactFlags[1] ? 1.0 : 0.0; // RF
+            bridge_->legs[1].contact = contactFlags[2] ? 1.0 : 0.0; // LH
+            bridge_->legs[3].contact = contactFlags[3] ? 1.0 : 0.0; // RH
+        }
 
         state_estimator_->estimate(bridge_->legs, bridge_->imu, period);
         // --- 初始化临时变量，防止仪表盘读取随机内存 ---
@@ -109,45 +185,50 @@ namespace dog_controllers
         if (currentState_ == ControlState::JOINT_STANDUP)
         {
             standUpTimer_ += period.seconds();
-            scalar_t phase = std::min(standUpTimer_ / standUpDuration_, 1.0);
-            scalar_t s = (1.0 - std::cos(M_PI * phase)) / 2.0;
+
+            // 第一阶段参数
+            scalar_t phase1_duration = standUpDuration_;
+
+            // 第二阶段参数
+            scalar_t phase2_duration = standUpDuration_; // 第二阶段持续时间
+            scalar_t phase1_end = phase1_duration;
+            scalar_t phase2_end = phase1_end + phase2_duration;
 
             for (int i = 0; i < 4; ++i)
             {
-                // 真机趴下：0，0，0；真机半站：0，1.45，0
-                // 仿真趴下：0，-1.8，0.5；仿真半站：0，-0.35，0.5
-                // --- 目标角度定义 ---
-                scalar_t q_haa_goal = 0.0;
-                scalar_t q_hfe_start = 0.0;
-                scalar_t q_hfe_goal = 1.45;
-                scalar_t q_kfe_goal = 0.0;
-
-                // --- 插值逻辑 ---
-                // 1. HAA
-                bridge_->legs[i].joints[0]->cmd_pos = q_haa_goal;
-
-                // 2. HFE
-                bridge_->legs[i].joints[1]->cmd_pos = q_hfe_start + s * (q_hfe_goal - q_hfe_start);
-
-                // 3. KFE
-                bridge_->legs[i].joints[2]->cmd_pos = q_kfe_goal;
+                if (standUpTimer_ <= phase1_end)
+                {
+                    scalar_t phase = standUpTimer_ / phase1_duration;
+                    scalar_t s = (1.0 - std::cos(M_PI * phase)) / 2.0;
+                    for (int j = 0; j < 3; ++j)
+                    {
+                        bridge_->legs[i].joints[j]->cmd_pos =
+                            standUpPhase1Start_[j] + s * (standUpPhase1Goal_[j] - standUpPhase1Start_[j]);
+                    }
+                }
+                else if ((standUpTimer_ <= phase2_end) && (standUpTimer_ > phase1_end))
+                {
+                    scalar_t phase = (standUpTimer_ - phase1_end) / phase2_duration;
+                    phase = std::min(phase, 1.0);
+                    scalar_t s = (1.0 - std::cos(M_PI * phase)) / 2.0;
+                    for (int j = 0; j < 3; ++j)
+                    {
+                        bridge_->legs[i].joints[j]->cmd_pos =
+                            standUpPhase1Goal_[j] + s * (standUpPhase2Goal_[j] - standUpPhase1Goal_[j]);
+                    }
+                }
 
                 // --- PD 参数设置
-                bridge_->legs[i].joints[0]->cmd_kp = 20.0;
-                bridge_->legs[i].joints[1]->cmd_kp = 20.0;
-                bridge_->legs[i].joints[2]->cmd_kp = 10.0;
-
-                bridge_->legs[i].joints[0]->cmd_kd = 2.0;
-                bridge_->legs[i].joints[1]->cmd_kd = 2.0;
-                bridge_->legs[i].joints[2]->cmd_kd = 2.0;
-
-                bridge_->legs[i].joints[0]->cmd_ff = 0.0;
-                bridge_->legs[i].joints[1]->cmd_ff = 0.0;
-                bridge_->legs[i].joints[2]->cmd_ff = 0.0;
+                for (int j = 0; j < 3; ++j)
+                {
+                    bridge_->legs[i].joints[j]->cmd_kp = standUpKp_[j];
+                    bridge_->legs[i].joints[j]->cmd_kd = standUpKd_[j];
+                    bridge_->legs[i].joints[j]->cmd_ff = 0.0;
+                }
             }
 
             // --- 切换逻辑 ---
-            if (phase >= 1.0)
+            if (standUpTimer_ > phase2_end)
             {
                 if (state_estimator_->currentObservation_.state(8) > 0.2)
                 {
@@ -155,8 +236,8 @@ namespace dog_controllers
                     state_estimator_->currentObservation_.state(8) = 0.25;
 
                     nmpc_controller_->start(state_estimator_->currentObservation_);
-                    // currentState_ = ControlState::NMPC_ACTIVE; // 记得取消注释
-                    RCLCPP_INFO(node_->get_logger(), "\033[1;32m[状态切换] HFE 摆动起立完成，NMPC 启动！\033[0m");
+                    currentState_ = ControlState::NMPC_ACTIVE;
+                    RCLCPP_INFO(node_->get_logger(), "\033[1;32m[状态切换] 二阶段站立完成，NMPC 启动！\033[0m");
                 }
             }
         }

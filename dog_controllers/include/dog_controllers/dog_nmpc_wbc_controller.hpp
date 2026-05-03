@@ -2,6 +2,7 @@
 #include "controller_interface/controller_interface.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
+#include <array>
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
 #include "common/dog_data_bridge.hpp"
@@ -48,9 +49,16 @@ namespace dog_controllers
         std::unique_ptr<std::thread> ros_interface_thread_;
         benchmark::RepeatedTimer mainLoopTimer_;
         bool isFirstUpdate_ = 1;
+        bool isSim_ = false;
+        bool useGaitContact_ = true;
         std::string urdfFile;
         std::string taskFile;
         std::string referenceFile;
+        std::array<scalar_t, 3> standUpPhase1Start_{0.0, 0.0, 0.0};
+        std::array<scalar_t, 3> standUpPhase1Goal_{0.0, 1.45, 0.0};
+        std::array<scalar_t, 3> standUpPhase2Goal_{0.0, 1.9, -0.94};
+        std::array<scalar_t, 3> standUpKp_{15.0, 15.0, 25.0};
+        std::array<scalar_t, 3> standUpKd_{2.0, 2.0, 2.0};
 
         enum class ControlState
         {
@@ -59,7 +67,7 @@ namespace dog_controllers
         };
         ControlState currentState_ = ControlState::JOINT_STANDUP;
         scalar_t standUpTimer_ = 0.0;
-        const scalar_t standUpDuration_ = 2.0;
+        scalar_t standUpDuration_ = 2.0;
     };
     class DogNmpcWbcController_God : public DogNmpcWbcController
     {

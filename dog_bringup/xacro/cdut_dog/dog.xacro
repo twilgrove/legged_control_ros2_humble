@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <robot name="dog" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+    <xacro:arg name="is_sim" default="true"/>
+
     <xacro:include filename="./const.xacro"/>
     <xacro:include filename="./ros2_control.xacro"/>
     <xacro:include filename="./leg.xacro"/>
@@ -87,9 +89,13 @@
 
     <ros2_control name="dog_System" type="system">
         <hardware>
-            <!-- <plugin>dog_hardware/DogGazeboHW</plugin>
-            <param name="delay">${cfg['controller_manager']['ros__parameters']['hw_params']['delay']}</param> -->
-            <plugin>dog_hardware/J60_6_hw</plugin>
+            <xacro:if value="$(arg is_sim)">
+                <plugin>dog_hardware/DogGazeboHW</plugin>
+                <param name="delay">${cfg['controller_manager']['ros__parameters']['hw_params']['delay']}</param>
+            </xacro:if>
+            <xacro:unless value="$(arg is_sim)">
+                <plugin>dog_hardware/J60_6_hw</plugin>
+            </xacro:unless>
         </hardware>
 
         <sensor name="imu_sensor">
@@ -116,31 +122,33 @@
         <xacro:leg_control_interface name="RH"/>
     </ros2_control>
 
-    <gazebo reference="imu_link">
-      <sensor name="imu_sensor" type="imu">
-        <always_on>true</always_on>
-        <update_rate>1000</update_rate>
-      </sensor>
-    </gazebo>
+    <xacro:if value="$(arg is_sim)">
+        <gazebo reference="imu_link">
+          <sensor name="imu_sensor" type="imu">
+            <always_on>true</always_on>
+            <update_rate>1000</update_rate>
+          </sensor>
+        </gazebo>
 
-    <gazebo>
-        <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
-            <parameters>$(find dog_bringup)/config/cdut_dog/robot_controllers.yaml</parameters>
-            <robot_param>robot_description</robot_param>
-            <robot_param_node>robot_state_publisher</robot_param_node>
-        </plugin>
-    </gazebo>
-    <gazebo>
-      <plugin name="dog_ground_truth" filename="libgazebo_ros_p3d.so">
-        <ros>
-          <remapping>odom:=/ground_truth</remapping>
-        </ros>
-        <body_name>base_link</body_name>
-        <frame_name>world</frame_name>
-        <update_rate>10.0</update_rate>
-        <xyz_offset>0 0 0</xyz_offset>
-        <rpy_offset>0 0 0</rpy_offset>
-        <gaussian_noise>0.001</gaussian_noise>
-      </plugin>
-    </gazebo>
+        <gazebo>
+            <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
+                <parameters>$(find dog_bringup)/config/cdut_dog/robot_controllers.yaml</parameters>
+                <robot_param>robot_description</robot_param>
+                <robot_param_node>robot_state_publisher</robot_param_node>
+            </plugin>
+        </gazebo>
+        <gazebo>
+          <plugin name="dog_ground_truth" filename="libgazebo_ros_p3d.so">
+            <ros>
+              <remapping>odom:=/ground_truth</remapping>
+            </ros>
+            <body_name>base_link</body_name>
+            <frame_name>world</frame_name>
+            <update_rate>10.0</update_rate>
+            <xyz_offset>0 0 0</xyz_offset>
+            <rpy_offset>0 0 0</rpy_offset>
+            <gaussian_noise>0.001</gaussian_noise>
+          </plugin>
+        </gazebo>
+    </xacro:if>
 </robot>

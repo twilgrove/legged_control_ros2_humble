@@ -4,7 +4,6 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch_ros.actions import Node
 from launch_ros.actions import Node, ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 from launch_ros.parameter_descriptions import ParameterValue
@@ -18,6 +17,8 @@ def generate_launch_description():
     pkg = get_package_share_directory("dog_bringup")
 
     xacro_file = os.path.join(pkg, "xacro", "cdut_dog", "dog.xacro")
+    is_sim = "true"
+    xacro_command = ["xacro ", xacro_file, " is_sim:=", is_sim]
     urdf_output_dir = os.path.join(pkg, "config", "cdut_dog", "description")
     urdf_output_file = os.path.join(urdf_output_dir, "dog.urdf")
     world_file = os.path.join(pkg, "config", "dog.world")
@@ -25,12 +26,8 @@ def generate_launch_description():
 
     generate_urdf = ExecuteProcess(
         cmd=[
-            "mkdir -p ",
-            urdf_output_dir,
-            " && xacro ",
-            xacro_file,
-            " -o ",
-            urdf_output_file,
+            f"mkdir -p {urdf_output_dir} && "
+            f"xacro {xacro_file} is_sim:={is_sim} -o {urdf_output_file}"
         ],
         shell=True,
         output="screen",
@@ -74,7 +71,7 @@ def generate_launch_description():
     controller = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["DogNmpcWbcController"],
+        arguments=["DogNmpcWbcControllerSim"],
     )
 
     dog_controller_container = ComposableNodeContainer(
@@ -95,7 +92,7 @@ def generate_launch_description():
                 parameters=[
                     {
                         "robot_description": ParameterValue(
-                            Command(["xacro ", xacro_file]), value_type=str
+                            Command(xacro_command), value_type=str
                         )
                     }
                 ],
